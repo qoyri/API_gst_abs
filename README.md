@@ -157,7 +157,7 @@ Chaque contrôleur correspond à un groupe d'opérations pour l'API :
 Swagger est intégré pour permettre d'afficher la liste des endpoints avec leur documentation détaillée. Vous pouvez également tester les endpoints directement depuis l'interface Swagger.
 
 ### URL Swagger :
-[http://localhost:5000/swagger/index.html](http://localhost:5000/swagger/index.html)
+[http://localhost:5000/home](http://localhost:5000/home)
 
 ---
 
