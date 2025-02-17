@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace gest_abs.Models;
@@ -10,6 +10,8 @@ public partial class Student
     public int UserId { get; set; }
 
     public int ClassId { get; set; }
+
+    public int? ParentId { get; set; } // Ajout de la relation avec un parent
 
     public string FirstName { get; set; } = null!;
 
@@ -23,5 +25,5 @@ public partial class Student
 
     public virtual User User { get; set; } = null!;
 
-    public virtual ICollection<User> Parents { get; set; } = new List<User>();
+    public virtual User? Parent { get; set; } // Référence au parent
 }
