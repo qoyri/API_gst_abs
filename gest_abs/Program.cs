@@ -2,6 +2,8 @@ using gest_abs.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using gest_abs;
 using Microsoft.OpenApi.Models;
@@ -14,6 +16,9 @@ builder.Services.AddDbContext<GestionAbsencesContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection"),
         new MySqlServerVersion(new Version(10, 11, 8))
     ));
+
+// Jeter la mappage par défaut des claims pour éviter toute modification du Role
+JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
 // Ajouter l'authentification JWT
 builder.Services.AddAuthentication(options =>
@@ -31,7 +36,9 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = jwtSettings["Issuer"],
         ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"])),
+        // Spécifier le type de claim contenant le rôle
+        RoleClaimType = ClaimTypes.Role
     };
 });
 
@@ -39,7 +46,6 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Ajouter des contrôleurs
 builder.Services.AddControllers();
 
 builder.Services.AddSwaggerGen(options =>
@@ -87,6 +93,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/home", () => Results.Redirect("/swagger"));
+
+app.UseMiddleware<BearerPrefixMiddleware>();
 
 // Configurer le Middleware pour l'authentification et l'autorisation
 app.UseHttpsRedirection();

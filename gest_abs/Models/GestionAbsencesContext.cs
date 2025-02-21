@@ -35,9 +35,14 @@ public partial class GestionAbsencesContext : DbContext
     public virtual DbSet<User> Users { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseMySql("server=82.66.203.90;database=gestion_absences;user=user_abs;password=%@8Sm1chel/#$%^3412", Microsoft.EntityFrameworkCore.ServerVersion.Parse("10.11.8-mariadb"));
-
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            // Configuration en production avec MySQL uniquement si aucune option n'a été définie
+            var productionConnectionString = "server=192.168.50.188;database=gestion_absences;user=user_abs;password=%@8Sm1chel/#$%^3412";
+            optionsBuilder.UseMySql(productionConnectionString, ServerVersion.AutoDetect(productionConnectionString));
+        }
+    }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
