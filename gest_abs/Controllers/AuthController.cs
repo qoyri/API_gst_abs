@@ -65,7 +65,7 @@ namespace gest_abs.Controllers
                 new Claim(JwtRegisteredClaimNames.Sub, username),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.Name, username),
-                new Claim(ClaimTypes.Role, role) // Ajouter le rôle dans les claims
+                new Claim("role", role) // Ajouter le rôle en minuscule
             };
 
             var token = new JwtSecurityToken(

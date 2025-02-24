@@ -20,6 +20,8 @@ public partial class GestionAbsencesContext : DbContext
 
     public virtual DbSet<Class> Classes { get; set; }
 
+    public virtual DbSet<EfmigrationsHistory> EfmigrationsHistories { get; set; }
+
     public virtual DbSet<Notification> Notifications { get; set; }
 
     public virtual DbSet<Reservation> Reservations { get; set; }
@@ -33,25 +35,9 @@ public partial class GestionAbsencesContext : DbContext
     public virtual DbSet<User> Users { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        if (!optionsBuilder.IsConfigured)
-        {
-            // Charger les configurations depuis appsettings.json
-            var configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory()) // Chemin de base du projet
-                .AddJsonFile("appsettings.json") // Fichier JSON à charger
-                .Build();
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseMySql("server=82.66.203.90;database=gestion_absences;user=user_abs;password=%@8Sm1chel/#$%^3412", Microsoft.EntityFrameworkCore.ServerVersion.Parse("10.11.8-mariadb"));
 
-            // Lire la chaîne de connexion dans le fichier
-            var connectionString = configuration.GetConnectionString("DefaultConnection");
-
-            // Configurer le DbContext avec la chaîne de connexion
-            optionsBuilder.UseMySql(
-                connectionString,
-                Microsoft.EntityFrameworkCore.ServerVersion.Parse("10.11.8-mariadb")
-            );
-        }
-    }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -122,6 +108,16 @@ public partial class GestionAbsencesContext : DbContext
                 .HasForeignKey(d => d.TeacherId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("classes_ibfk_1");
+        });
+
+        modelBuilder.Entity<EfmigrationsHistory>(entity =>
+        {
+            entity.HasKey(e => e.MigrationId).HasName("PRIMARY");
+
+            entity.ToTable("__EFMigrationsHistory");
+
+            entity.Property(e => e.MigrationId).HasMaxLength(150);
+            entity.Property(e => e.ProductVersion).HasMaxLength(32);
         });
 
         modelBuilder.Entity<Notification>(entity =>
