@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using gest_abs.Models;
+using static gest_abs.Services.HasherPassword;
 
 namespace gest_abs;
 
@@ -8,31 +9,43 @@ public static class DbInitializer
 {
     public static void Initialize(GestionAbsencesContext context)
     {
-        // Vérifier qu'il y a bien une base de données connectée
         context.Database.EnsureCreated();
 
-        // Vérifier si l'utilisateur "Admin" existe déjà
         if (context.Users.Any(u => u.Email == "admin"))
         {
-            return; // Si l'administrateur existe déjà, arrêter l'initialisation
+            return;
         }
 
-        // Créer un nouvel utilisateur Admin par défaut
         var adminUser = new User
         {
             Email = "admin",
             Role = "admin",
-            Password = HashPassword("admin123") // Mot de passe hashé
+            Password = HashPassword("admin123")
+        };
+    
+        var parentUser = new User
+        {
+            Email = "parent@parent.fr",
+            Role = "parent",
+            Password = HashPassword("parent123")
+        };
+    
+        var teacherUser = new User
+        {
+            Email = "teacher@teacher.fr",
+            Role = "professeur",
+            Password = HashPassword("teacher123")
+        };
+    
+        var studentUser = new User
+        {
+            Email = "student@student.fr",
+            Role = "eleve",
+            Password = HashPassword("student123")
         };
 
-        context.Users.Add(adminUser);
+        context.Users.AddRange(adminUser, parentUser, teacherUser, studentUser);
         context.SaveChanges();
     }
-
-    private static string HashPassword(string password)
-    {
-        using var sha256 = SHA256.Create(); // Utilisation de l'algorithme SHA-256
-        var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-        return BitConverter.ToString(bytes).Replace("-", "").ToLower(); // Convertir le hachage en chaîne hexadécimale
-    }
+    
 }

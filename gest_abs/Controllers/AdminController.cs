@@ -1,20 +1,16 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
-using gest_abs.DTO;
-using gest_abs.Models;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using gest_abs.Models;
+using gest_abs.DTO;
+using System.Linq;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace gest_abs.Controllers
 {
+    [Route("api/admin")]
     [ApiController]
-    [Route("api/[controller]")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "admin")] // 🔹 Seuls les admins peuvent gérer les parents
     public class AdminController : ControllerBase
     {
         private readonly GestionAbsencesContext _context;
@@ -24,147 +20,111 @@ namespace gest_abs.Controllers
             _context = context;
         }
 
-        // GET: api/Admin/users
-        [HttpGet("users")]
-        public async Task<ActionResult<IEnumerable<AdminDTO.UserDto>>> GetUsers()
+        // 🔹 GET /api/admin/parents → Lister tous les parents
+        [HttpGet("parents")]
+        public IActionResult GetAllParents()
         {
-            var users = await _context.Users.ToListAsync();
-            var userDtos = users.Select(u => new AdminDTO.UserDto
-            {
-                Id = u.Id,
-                Email = u.Email,
-                Role = u.Role,
-                CreatedAt = u.CreatedAt
-            }).ToList();
+            var parents = _context.Users
+                .Where(u => u.Role == "parent")
+                .Select(p => new ParentDTO
+                {
+                    Id = p.Id,
+                    Email = p.Email,
+                    CreatedAt = p.CreatedAt.HasValue ? p.CreatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss") : "N/A"
+                })
+                .ToList();
 
-            return Ok(userDtos);
+            return Ok(parents);
         }
 
-        // GET: api/Admin/users/5
-        [HttpGet("users/{id}")]
-        public async Task<ActionResult<AdminDTO.UserDto>> GetUser(int id)
+        // 🔹 GET /api/admin/parents/{id} → Voir les détails d’un parent
+        [HttpGet("parents/{id}")]
+        public IActionResult GetParentById(int id)
         {
-            var user = await _context.Users.FindAsync(id);
-            if (user == null)
-                return NotFound();
+            var parent = _context.Users
+                .Where(u => u.Id == id && u.Role == "parent")
+                .Select(p => new ParentDTO
+                {
+                    Id = p.Id,
+                    Email = p.Email,
+                    CreatedAt = p.CreatedAt.HasValue ? p.CreatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss") : "N/A"
+                })
+                .FirstOrDefault();
 
-            var userDto = new AdminDTO.UserDto
-            {
-                Id = user.Id,
-                Email = user.Email,
-                Role = user.Role,
-                CreatedAt = user.CreatedAt
-            };
+            if (parent == null)
+                return NotFound(new ErrorResponseDTO { Message = "Parent non trouvé." });
 
-            return Ok(userDto);
+            return Ok(parent);
         }
 
-        // POST: api/Admin/users
-        [HttpPost("users")]
-        public async Task<ActionResult<AdminDTO.UserDto>> CreateUser(AdminDTO.UserCreateDto userCreateDto)
+        // 🔹 POST /api/admin/parents → Créer un parent
+        [HttpPost("parents")]
+        public IActionResult CreateParent([FromBody] ParentDTO newParentDTO)
         {
-            var user = new User
+            if (_context.Users.Any(u => u.Email == newParentDTO.Email))
+                return Conflict(new ErrorResponseDTO { Message = "Cet email est déjà utilisé." });
+
+            if (!new EmailAddressAttribute().IsValid(newParentDTO.Email))
+                return BadRequest(new ErrorResponseDTO { Message = "Email invalide." });
+
+            var newUser = new User
             {
-                Email = userCreateDto.Email,
-                Role = userCreateDto.Role,
-                Password = HashPassword(userCreateDto.Password), // Hasher le mot de passe
+                Email = newParentDTO.Email,
+                Role = "parent",
                 CreatedAt = DateTime.UtcNow
             };
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            _context.Users.Add(newUser);
+            _context.SaveChanges();
 
-            var userDto = new AdminDTO.UserDto
-            {
-                Id = user.Id,
-                Email = user.Email,
-                Role = user.Role,
-                CreatedAt = user.CreatedAt
-            };
-
-            return CreatedAtAction(nameof(GetUser), new { id = user.Id }, userDto);
+            return CreatedAtAction(nameof(GetParentById), new { id = newUser.Id }, newParentDTO);
         }
 
-        // PUT: api/Admin/users/5
-        [HttpPut("users/{id}")]
-        public async Task<IActionResult> UpdateUser(int id, AdminDTO.UserUpdateDto userUpdateDto)
+        // 🔹 PUT /api/admin/parents/{id} → Modifier un parent
+        [HttpPut("parents/{id}")]
+        public IActionResult UpdateParent(int id, [FromBody] ParentDTO updatedParentDTO)
         {
-            if (id != userUpdateDto.Id)
+            var existingParent = _context.Users.FirstOrDefault(u => u.Id == id && u.Role == "parent");
+
+            if (existingParent == null)
+                return NotFound(new ErrorResponseDTO { Message = "Parent non trouvé." });
+
+            if (!new EmailAddressAttribute().IsValid(updatedParentDTO.Email))
+                return BadRequest(new ErrorResponseDTO { Message = "Email invalide." });
+
+            existingParent.Email = updatedParentDTO.Email;
+            _context.SaveChanges();
+
+            return Ok(new { Message = "Parent mis à jour avec succès." });
+        }
+
+        // 🔹 DELETE /api/admin/parents/{id} → Supprimer un parent
+        // 🔹 DELETE /api/admin/parents/{id} → Supprimer un parent
+        [HttpDelete("parents/{id}")]
+        public IActionResult DeleteParent(int id)
+        {
+            var parent = _context.Users.FirstOrDefault(u => u.Id == id && u.Role == "parent");
+
+            if (parent == null)
+                return NotFound(new ErrorResponseDTO { Message = "Parent non trouvé." });
+
+            // 🔹 Vérifier si des élèves sont liés à ce parent
+            var students = _context.Students.Where(s => s.Parents.Contains(parent)).ToList();
+
+            if (students.Any())
             {
-                return BadRequest("L'identifiant ne correspond pas.");
-            }
-
-            var user = await _context.Users.FindAsync(id);
-            if (user == null)
-                return NotFound();
-
-            user.Email = userUpdateDto.Email;
-            user.Role = userUpdateDto.Role;
-
-            if (!string.IsNullOrWhiteSpace(userUpdateDto.Password))
-            {
-                user.Password = HashPassword(userUpdateDto.Password);
-            }
-
-            _context.Entry(user).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.Users.Any(u => u.Id == id))
+                // 🔹 Détacher les enfants en mettant parent_id = NULL
+                foreach (var student in students)
                 {
-                    return NotFound();
+                    student.Parents.Remove(parent);
                 }
-
-                throw;
             }
 
-            return NoContent();
+            _context.Users.Remove(parent);
+            _context.SaveChanges();
+
+            return Ok(new { Message = "Parent supprimé avec succès." });
         }
 
-        // DELETE: api/Admin/users/5
-        [HttpDelete("users/{id}")]
-        public async Task<IActionResult> DeleteUser(int id)
-        {
-            var user = await _context.Users.FindAsync(id);
-            if (user == null)
-                return NotFound();
-
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        // POST: api/Admin/users/5/reset-password
-        [HttpPost("users/{id}/reset-password")]
-        public async Task<IActionResult> ResetPassword(int id, AdminDTO.ResetPasswordDto resetPasswordDto)
-        {
-            var user = await _context.Users.FindAsync(id);
-            if (user == null)
-                return NotFound();
-
-            if (resetPasswordDto.NewPassword != resetPasswordDto.ConfirmPassword)
-            {
-                return BadRequest("Les mots de passe ne correspondent pas.");
-            }
-
-            user.Password = HashPassword(resetPasswordDto.NewPassword);
-            _context.Entry(user).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        // Méthode utilitaire pour hasher le mot de passe en utilisant SHA-256
-        private static string HashPassword(string password)
-        {
-            using var sha256 = SHA256.Create();
-            var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-            return BitConverter.ToString(bytes).Replace("-", "").ToLower();
-        }
     }
 }

@@ -10,6 +10,25 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configurer la journalisation
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.SetMinimumLevel(LogLevel.Debug);
+
+// Ajouter la configuration CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend",
+        builder =>
+        {
+            builder.WithOrigins("http://localhost:3000")
+                   .AllowAnyHeader()
+                   .AllowAnyMethod()
+                   .AllowCredentials();
+        });
+});
+
 // Ajouter Entity Framework Core
 builder.Services.AddDbContext<GestionAbsencesContext>(options =>
     options.UseMySql(
@@ -38,7 +57,47 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = jwtSettings["Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"])),
         // Spécifier le type de claim contenant le rôle
-        RoleClaimType = ClaimTypes.Role
+        RoleClaimType = ClaimTypes.Role,
+        NameClaimType = ClaimTypes.Name
+    };
+    
+    // Ajouter des logs pour le débogage de l'authentification JWT
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("Token validé pour l'utilisateur: {User}", context.Principal?.Identity?.Name);
+            
+            if (context.Principal?.Identity is ClaimsIdentity identity)
+            {
+                foreach (var claim in identity.Claims)
+                {
+                    logger.LogInformation("Claim: {Type} = {Value}", claim.Type, claim.Value);
+                }
+                
+                var roles = identity.Claims
+                    .Where(c => c.Type == ClaimTypes.Role || c.Type == "role" || c.Type == "roles")
+                    .Select(c => c.Value)
+                    .ToList();
+                
+                logger.LogInformation("Rôles trouvés: {Roles}", string.Join(", ", roles));
+            }
+            
+            return Task.CompletedTask;
+        },
+        OnAuthenticationFailed = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogError("Échec de l'authentification: {Error}", context.Exception.Message);
+            return Task.CompletedTask;
+        },
+        OnChallenge = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning("Challenge d'authentification déclenché: {Error}", context.Error);
+            return Task.CompletedTask;
+        }
     };
 });
 
@@ -78,11 +137,21 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+
 // Initialiser la base de données
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<GestionAbsencesContext>();
-    DbInitializer.Initialize(context);
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        DbInitializer.Initialize(context);
+        logger.LogInformation("Base de données initialisée avec succès");
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Erreur lors de l'initialisation de la base de données");
+    }
 }
 
 // Configurer Swagger
@@ -93,6 +162,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/home", () => Results.Redirect("/swagger"));
+
+// Utiliser CORS avant l'authentification et l'autorisation
+app.UseCors("AllowFrontend");
 
 app.UseMiddleware<BearerPrefixMiddleware>();
 
@@ -105,3 +177,4 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
