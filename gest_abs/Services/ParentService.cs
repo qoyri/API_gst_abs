@@ -1,4 +1,4 @@
-﻿using gest_abs.Models;
+using gest_abs.Models;
 using gest_abs.DTO;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,7 +13,7 @@ namespace gest_abs.Services
             _context = context;
         }
 
-        // 🔹 Récupérer les absences des enfants d’un parent
+        // 🔹 Récupérer les absences des enfants d'un parent
         public List<ParentAbsenceDTO> GetParentAbsences(string parentEmail)
         {
             try
@@ -99,10 +99,33 @@ namespace gest_abs.Services
                 }
 
                 absence.Status = "justifiée"; // Utiliser la bonne valeur ENUM
+                absence.Reason = justification.Reason;
                 absence.Document = justification.Document ?? "Aucun document fourni";
+                absence.UpdatedAt = DateTime.UtcNow;
 
                 _context.SaveChanges();
                 _context.Database.CloseConnection(); // ✅ Fermeture de la connexion
+
+                // Créer une notification pour informer les enseignants
+                var student = _context.Students
+                    .Include(s => s.Class)
+                    .ThenInclude(c => c.Teacher)
+                    .FirstOrDefault(s => s.Id == absence.StudentId);
+
+                if (student?.Class?.Teacher != null)
+                {
+                    var teacherId = student.Class.Teacher.UserId;
+                    var notification = new Notification
+                    {
+                        UserId = teacherId,
+                        Message = $"L'absence de {student.FirstName} {student.LastName} du {absence.AbsenceDate.ToString("dd/MM/yyyy")} a été justifiée.",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    _context.Notifications.Add(notification);
+                    _context.SaveChanges();
+                }
 
                 Console.WriteLine("✅ Absence justifiée avec succès.");
                 return true;
@@ -113,8 +136,6 @@ namespace gest_abs.Services
                 return false;
             }
         }
-
-
 
         // 🔹 Récupérer les notifications non lues
         public List<NotificationDTO> GetParentNotifications(string parentEmail)
@@ -130,7 +151,7 @@ namespace gest_abs.Services
                 }
 
                 return _context.Notifications
-                    .Where(n => n.UserId == parent.Id && (n.IsRead == false || n.IsRead == null))
+                    .Where(n => n.UserId == parent.Id)
                     .OrderByDescending(n => n.CreatedAt ?? DateTime.MinValue)
                     .Select(n => new NotificationDTO
                     {
@@ -147,7 +168,7 @@ namespace gest_abs.Services
             }
         }
 
-        // 🔹 Récupérer les statistiques des absences d’un enfant
+        // 🔹 Récupérer les statistiques des absences d'un enfant
         public StatsDTO GetStudentStats(string parentEmail, int studentId)
         {
             try
@@ -162,6 +183,16 @@ namespace gest_abs.Services
                     return null;
                 }
 
+                var student = _context.Students
+                    .Include(s => s.Class)
+                    .FirstOrDefault(s => s.Id == studentId);
+
+                if (student == null)
+                {
+                    Console.WriteLine("❌ Étudiant introuvable.");
+                    return null;
+                }
+
                 var absences = _context.Absences
                     .Where(a => a.StudentId == studentId)
                     .ToList();
@@ -169,24 +200,36 @@ namespace gest_abs.Services
                 if (!absences.Any())
                 {
                     Console.WriteLine("❌ Aucune absence trouvée pour cet élève.");
-                    return null;
+                    // Retourner des statistiques vides plutôt que null
+                    return new StatsDTO
+                    {
+                        StudentId = studentId,
+                        StudentName = $"{student.FirstName} {student.LastName}",
+                        TotalAbsences = 0,
+                        JustifiedAbsences = 0,
+                        UnjustifiedAbsences = 0,
+                        AbsencesByMonth = new Dictionary<string, int>()
+                    };
                 }
 
                 Console.WriteLine($"✅ Statistiques récupérées pour l'élève {studentId}.");
 
+                // Calculer les absences par mois avec des noms de mois
+                var absencesByMonth = absences
+                    .GroupBy(a => a.AbsenceDate.Month)
+                    .ToDictionary(
+                        g => GetMonthName(g.Key), 
+                        g => g.Count()
+                    );
+
                 return new StatsDTO
                 {
                     StudentId = studentId,
-                    StudentName = _context.Students
-                        .Where(s => s.Id == studentId)
-                        .Select(s => s.FirstName + " " + s.LastName)
-                        .FirstOrDefault(),
+                    StudentName = $"{student.FirstName} {student.LastName}",
                     TotalAbsences = absences.Count,
-                    JustifiedAbsences = absences.Count(a => a.Status == "justifié"),
-                    UnjustifiedAbsences = absences.Count(a => a.Status == "non justifié"),
-                    AbsencesByMonth = absences
-                        .GroupBy(a => a.AbsenceDate.Month)
-                        .ToDictionary(g => g.Key.ToString(), g => g.Count())
+                    JustifiedAbsences = absences.Count(a => a.Status == "justifiée"),
+                    UnjustifiedAbsences = absences.Count(a => a.Status == "non justifiée"),
+                    AbsencesByMonth = absencesByMonth
                 };
             }
             catch (Exception ex)
@@ -195,5 +238,59 @@ namespace gest_abs.Services
                 return null;
             }
         }
+
+        // Méthode utilitaire pour obtenir le nom du mois
+        private string GetMonthName(int month)
+        {
+            return month switch
+            {
+                1 => "Janvier",
+                2 => "Février",
+                3 => "Mars",
+                4 => "Avril",
+                5 => "Mai",
+                6 => "Juin",
+                7 => "Juillet",
+                8 => "Août",
+                9 => "Septembre",
+                10 => "Octobre",
+                11 => "Novembre",
+                12 => "Décembre",
+                _ => "Inconnu"
+            };
+        }
+
+        // 🔹 Récupérer les enfants d'un parent
+        public List<StudentDTO> GetParentStudents(string parentEmail)
+        {
+            try
+            {
+                var parent = _context.Users
+                    .Include(p => p.Students)
+                    .ThenInclude(s => s.Class)
+                    .FirstOrDefault(u => u.Email == parentEmail);
+
+                if (parent == null || !parent.Students.Any())
+                {
+                    Console.WriteLine("❌ Parent introuvable ou aucun élève associé.");
+                    return new List<StudentDTO>();
+                }
+
+                return parent.Students.Select(s => new StudentDTO
+                {
+                    Id = s.Id,
+                    ClassId = s.ClassId,
+                    FirstName = s.FirstName,
+                    LastName = s.LastName,
+                    Birthdate = s.Birthdate
+                }).ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ ERREUR lors de la récupération des élèves : {ex.Message}");
+                return new List<StudentDTO>();
+            }
+        }
     }
 }
+

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Pomelo.EntityFrameworkCore.MySql.Scaffolding.Internal;
@@ -34,12 +34,20 @@ public partial class GestionAbsencesContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    // Ajouter ces propriétés DbSet à la classe GestionAbsencesContext
+    public virtual DbSet<AlertConfig> AlertConfigs { get; set; }
+    public virtual DbSet<PointsConfig> PointsConfigs { get; set; }
+    public virtual DbSet<PointsHistory> PointsHistory { get; set; }
+    public virtual DbSet<AppConfig> AppConfigs { get; set; }
+    public virtual DbSet<Schedule> Schedules { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseMySql("server=82.66.203.90;database=gestion_absences;user=user_abs;password=%@8Sm1chel/#$%^3412", Microsoft.EntityFrameworkCore.ServerVersion.Parse("10.11.8-mariadb"));
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // Conserver le code existant
         modelBuilder
             .UseCollation("utf8mb4_general_ci")
             .HasCharSet("utf8mb4");
@@ -315,8 +323,82 @@ public partial class GestionAbsencesContext : DbContext
                     });
         });
 
+        // Ajouter la configuration pour AlertConfig
+        modelBuilder.Entity<AlertConfig>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("alert_configs");
+            entity.Property(e => e.Id).HasColumnType("int(11)").HasColumnName("id");
+            entity.Property(e => e.MaxAbsencesBeforeAlert).HasColumnType("int(11)").HasColumnName("max_absences_before_alert");
+            entity.Property(e => e.NotifyParents).HasColumnName("notify_parents");
+            entity.Property(e => e.NotifyTeachers).HasColumnName("notify_teachers");
+            entity.Property(e => e.NotifyAdmin).HasColumnName("notify_admin");
+            entity.Property(e => e.AlertMessage).HasColumnType("text").HasColumnName("alert_message");
+        });
+
+        // Ajouter la configuration pour PointsConfig
+        modelBuilder.Entity<PointsConfig>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("points_configs");
+            entity.Property(e => e.Id).HasColumnType("int(11)").HasColumnName("id");
+            entity.Property(e => e.PointsPerJustifiedAbsence).HasColumnType("int(11)").HasColumnName("points_per_justified_absence");
+            entity.Property(e => e.PointsPerUnjustifiedAbsence).HasColumnType("int(11)").HasColumnName("points_per_unjustified_absence");
+            entity.Property(e => e.PointsPerLateArrival).HasColumnType("int(11)").HasColumnName("points_per_late_arrival");
+            entity.Property(e => e.BonusPointsForPerfectAttendance).HasColumnType("int(11)").HasColumnName("bonus_points_for_perfect_attendance");
+            entity.Property(e => e.BonusPointsPerMonth).HasColumnType("int(11)").HasColumnName("bonus_points_per_month");
+        });
+
+        // Ajouter la configuration pour PointsHistory
+        modelBuilder.Entity<PointsHistory>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("points_history");
+            entity.HasIndex(e => e.StudentId, "student_id");
+            entity.Property(e => e.Id).HasColumnType("int(11)").HasColumnName("id");
+            entity.Property(e => e.StudentId).HasColumnType("int(11)").HasColumnName("student_id");
+            entity.Property(e => e.Date).HasColumnType("datetime").HasColumnName("date");
+            entity.Property(e => e.Points).HasColumnType("int(11)").HasColumnName("points");
+            entity.Property(e => e.Reason).HasColumnType("text").HasColumnName("reason");
+            entity.Property(e => e.Type).HasMaxLength(50).HasColumnName("type");
+
+            entity.HasOne(d => d.Student).WithMany(p => p.PointsHistory)
+                .HasForeignKey(d => d.StudentId)
+                .HasConstraintName("points_history_ibfk_1");
+        });
+
+        // Ajouter la configuration pour AppConfig
+        modelBuilder.Entity<AppConfig>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("app_configs");
+            entity.Property(e => e.Id).HasColumnType("int(11)").HasColumnName("id");
+            entity.Property(e => e.Key).HasMaxLength(100).HasColumnName("key");
+            entity.Property(e => e.Value).HasColumnType("text").HasColumnName("value");
+        });
+
+        // Ajouter la configuration pour Schedule
+        modelBuilder.Entity<Schedule>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+            entity.ToTable("schedules");
+            entity.HasIndex(e => e.ClassId, "class_id");
+            entity.Property(e => e.Id).HasColumnType("int(11)").HasColumnName("id");
+            entity.Property(e => e.ClassId).HasColumnType("int(11)").HasColumnName("class_id");
+            entity.Property(e => e.Date).HasColumnName("date");
+            entity.Property(e => e.StartTime).HasColumnType("time").HasColumnName("start_time");
+            entity.Property(e => e.EndTime).HasColumnType("time").HasColumnName("end_time");
+            entity.Property(e => e.Subject).HasMaxLength(100).HasColumnName("subject");
+            entity.Property(e => e.Description).HasColumnType("text").HasColumnName("description");
+
+            entity.HasOne(d => d.Class).WithMany(p => p.Schedules)
+                .HasForeignKey(d => d.ClassId)
+                .HasConstraintName("schedules_ibfk_1");
+        });
+
         OnModelCreatingPartial(modelBuilder);
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }
+

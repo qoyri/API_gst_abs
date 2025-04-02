@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 
 public class BearerPrefixMiddleware
@@ -22,3 +22,4 @@ public class BearerPrefixMiddleware
         await _next(context);
     }
 }
+

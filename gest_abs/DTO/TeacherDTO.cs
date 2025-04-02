@@ -1,28 +1,30 @@
-﻿namespace gest_abs.DTO;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
-public class TeacherDTO
+namespace gest_abs.DTO
 {
-    // DTO pour la lecture d'un Teacher
-    public class TeacherDto
+    public class TeacherDTO
     {
         public int Id { get; set; }
         public int UserId { get; set; }
-        public string Subject { get; set; } = null!;
-        public string Email { get; set; } = null!;
+        public string Subject { get; set; }
+        public string Email { get; set; }
     }
 
-    // DTO pour la création d'un Teacher
-    public class TeacherCreateDto
-    {
-        public int UserId { get; set; }
-        public string Subject { get; set; } = null!;
-    }
-
-    // DTO pour la mise à jour d'un Teacher
-    public class TeacherUpdateDto
+    public class TeacherProfileDTO
     {
         public int Id { get; set; }
-        public int UserId { get; set; }
-        public string Subject { get; set; } = null!;
+        public string Email { get; set; }
+        public string Subject { get; set; }
+        public DateTime? CreatedAt { get; set; }
+    }
+
+    public class TeacherUpdateProfileDTO
+    {
+        public string Subject { get; set; }
+        public string CurrentPassword { get; set; }
+        public string NewPassword { get; set; }
     }
 }
+

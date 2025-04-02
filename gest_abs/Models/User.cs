@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace gest_abs.Models;
@@ -25,3 +25,4 @@ public partial class User
 
     public virtual ICollection<Student> Students { get; set; } = new List<Student>();
 }
+

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace gest_abs.DTO
 {
@@ -10,3 +10,4 @@ namespace gest_abs.DTO
         public string Document { get; set; }
     }
 }
+

@@ -1,4 +1,4 @@
-﻿namespace gest_abs.DTO
+namespace gest_abs.DTO
 {
     public class StatsDTO
     {
@@ -10,3 +10,4 @@
         public Dictionary<string, int> AbsencesByMonth { get; set; }
     }
 }
+

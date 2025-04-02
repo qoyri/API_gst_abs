@@ -1,4 +1,4 @@
-﻿namespace gest_abs.DTO
+namespace gest_abs.DTO
 {
     public class StudentUpdateDTO
     {
@@ -8,3 +8,4 @@
         public DateOnly? Birthdate { get; set; }
     }
 }
+

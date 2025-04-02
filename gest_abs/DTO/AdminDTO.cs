@@ -1,4 +1,4 @@
-﻿namespace gest_abs.DTO;
+namespace gest_abs.DTO;
 
 public class AdminDTO
 {
@@ -35,3 +35,4 @@ public class AdminDTO
         public string ConfirmPassword { get; set; } = null!;
     }
 }
+

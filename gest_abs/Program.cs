@@ -6,10 +6,29 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using gest_abs;
-using gest_abs.Services;
 using Microsoft.OpenApi.Models;
+using gest_abs.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configurer la journalisation
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.SetMinimumLevel(LogLevel.Debug);
+
+// Modifier la configuration CORS pour accepter les connexions depuis n'importe quelle origine
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        builder =>
+        {
+            builder.AllowAnyOrigin()
+                   .AllowAnyHeader()
+                   .AllowAnyMethod();
+        });
+});
+
 // Ajouter Entity Framework Core
 builder.Services.AddDbContext<GestionAbsencesContext>(options =>
     options.UseMySql(
@@ -38,20 +57,62 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = jwtSettings["Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"])),
         // Spécifier le type de claim contenant le rôle
-        RoleClaimType = ClaimTypes.Role
+        RoleClaimType = ClaimTypes.Role,
+        NameClaimType = ClaimTypes.Name
+    };
+    
+    // Ajouter des logs pour le débogage de l'authentification JWT
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("Token validé pour l'utilisateur: {User}", context.Principal?.Identity?.Name);
+            
+            if (context.Principal?.Identity is ClaimsIdentity identity)
+            {
+                foreach (var claim in identity.Claims)
+                {
+                    logger.LogInformation("Claim: {Type} = {Value}", claim.Type, claim.Value);
+                }
+                
+                var roles = identity.Claims
+                    .Where(c => c.Type == ClaimTypes.Role || c.Type == "role" || c.Type == "roles")
+                    .Select(c => c.Value)
+                    .ToList();
+                
+                logger.LogInformation("Rôles trouvés: {Roles}", string.Join(", ", roles));
+            }
+            
+            return Task.CompletedTask;
+        },
+        OnAuthenticationFailed = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogError("Échec de l'authentification: {Error}", context.Exception.Message);
+            return Task.CompletedTask;
+        },
+        OnChallenge = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning("Challenge d'authentification déclenché: {Error}", context.Error);
+            return Task.CompletedTask;
+        }
     };
 });
-builder.Services.AddAuthorization();
+
+// Enregistrer les services
+builder.Services.AddScoped<ParentService>();
+builder.Services.AddScoped<TeacherService>();
+builder.Services.AddScoped<StudentService>();
+builder.Services.AddScoped<AdminConfigService>();
+builder.Services.AddScoped<PointsService>();
 
 // Activer Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Ajouter des contrôleurs
 builder.Services.AddControllers();
-
-// 🔹 Enregistrer le service ParentService
-builder.Services.AddScoped<ParentService>(); 
 
 builder.Services.AddSwaggerGen(options =>
 {
@@ -83,11 +144,23 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+
 // Initialiser la base de données
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<GestionAbsencesContext>();
-    DbInitializer.Initialize(context);
+    // Ajouter cette ligne après la création du contexte dans la méthode Initialize
+    context.Database.Migrate();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        DbInitializer.Initialize(context);
+        logger.LogInformation("Base de données initialisée avec succès");
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Erreur lors de l'initialisation de la base de données");
+    }
 }
 
 // Configurer Swagger
@@ -98,6 +171,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/home", () => Results.Redirect("/swagger"));
+
+// Utiliser CORS avant l'authentification et l'autorisation
+app.UseCors("AllowAll");
 
 app.UseMiddleware<BearerPrefixMiddleware>();
 
@@ -110,3 +186,4 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+

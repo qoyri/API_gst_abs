@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace gest_abs.Models;
@@ -22,4 +22,8 @@ public partial class Absence
     public DateTime? UpdatedAt { get; set; }
 
     public virtual Student Student { get; set; } = null!;
+
+    // Ajouter cette propriété à la classe Absence
+    public bool PointsProcessed { get; set; }
 }
+

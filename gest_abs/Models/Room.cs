@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace gest_abs.Models;
@@ -15,3 +15,4 @@ public partial class Room
 
     public virtual ICollection<Reservation> Reservations { get; set; } = new List<Reservation>();
 }
+

@@ -1,4 +1,4 @@
-﻿namespace gest_abs.DTO
+namespace gest_abs.DTO
 {
     public class ParentAbsenceDTO
     {
@@ -9,3 +9,4 @@
         public string Status { get; set; }
     }
 }
+

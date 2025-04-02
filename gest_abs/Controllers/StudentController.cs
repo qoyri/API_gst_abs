@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Threading.Tasks;
 using gest_abs.DTO;
 using gest_abs.Models;
@@ -77,7 +77,7 @@ namespace gest_abs.Controllers
             _context.Students.Add(student);
             await _context.SaveChangesAsync();
 
-            // Retourner l’étudiant créé au format DTO
+            // Retourner l'étudiant créé au format DTO
             var studentDto = new StudentDTO
             {
                 Id = student.Id,
@@ -127,3 +127,4 @@ namespace gest_abs.Controllers
         }
     }
 }
+

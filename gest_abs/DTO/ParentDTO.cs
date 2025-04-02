@@ -1,4 +1,4 @@
-﻿namespace gest_abs.DTO
+namespace gest_abs.DTO
 {
     public class ParentDTO
     {
@@ -7,3 +7,4 @@
         public string CreatedAt { get; set; }
     }
 }
+
